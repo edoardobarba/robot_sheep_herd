@@ -1,9 +1,18 @@
 import numpy as np
 import matplotlib
+
 from time import sleep
 
 matplotlib.use('TkAgg')  # Replace 'TkAgg' with the backend of your choice
 import matplotlib.pyplot as plt
+
+
+def polar_angle(vector):
+    # Compute the angle in radians using numpy.arctan2
+    angle_rad = np.arctan2(vector[1], vector[0])
+    # Ensure the angle is in the range [0, 2*pi]
+    # angle_rad = np.mod(angle_rad, 2 * np.pi)
+    return angle_rad
 
 
 class HerdModel:
@@ -18,6 +27,12 @@ class HerdModel:
         """
         self.robots = np.empty(n_robots, dtype=object)
         self.target = None
+
+        # Target kinemetic model
+        # Define Ah as a 2x2 identity matrix
+        self.At = np.eye(2)
+        # Define Bh as a 2x2 identity matrix (assuming you have 2 inputs)
+        self.Bt = np.eye(2)
 
         self.num_agents = n_robots
         self.current_id = 0
@@ -38,11 +53,14 @@ class HerdModel:
         self.n_steps = n_steps
 
         self.xStore = np.empty(n_steps, dtype='object')
+        self.tStore = np.empty(n_steps, dtype='object')
 
         self.A_tilda = self.get_A_tilda()
 
+
+
     def add_target(self):
-        self.target = Target()
+        self.target = Target(At=self.At, Bt=self.Bt)
 
     def add_agents(self, n_robots):
         """
@@ -51,7 +69,7 @@ class HerdModel:
         """
 
         for i in range(n_robots):
-            Ri = 10 * (np.random.rand(2, 2) - 0.5)
+            Ri = 1 * (np.random.rand(2, 2) - 0.5)
             # Calculate the covariance matrix by multiplying the matrix with its transpose
             Ri = np.dot(Ri, Ri.T)
 
@@ -61,17 +79,17 @@ class HerdModel:
                 Hi = (np.random.rand(2, 2) - 0.5)
 
             # Hi = np.identity(2)
-            Qi = 10 * (np.random.rand(2, 2) - 0.5)
+            Qi = 1 * (np.random.rand(2, 2) - 0.5)
             # Calculate the covariance matrix by multiplying the matrix with its transpose
             Qi = np.dot(Qi, Qi.T)
 
-            R_GPS = 10 * (np.random.rand(2, 2) - 0.5)
+            R_GPS = 1 * (np.random.rand(2, 2) - 0.5)
             # Calculate the covariance matrix by multiplying the matrix with its transpose
             R_GPS = np.dot(R_GPS, R_GPS.T)
 
             # random_pos = np.random.uniform(-10,10, (2, 1))
-            random_x = np.random.uniform(0, 10)
-            random_y = np.random.uniform(0, 10)
+            random_x = np.random.uniform(0, )
+            random_y = 5 + np.random.uniform(0, 1)
             random_pos = np.array([[random_x], [random_y]])
             robot = Robot_sheep(unique_id=i, pos=random_pos, Ri=Ri, Hi=Hi, Qi=Qi, R_GPS=R_GPS, CR=self.CR)
             # print(robot.pos)
@@ -82,32 +100,75 @@ class HerdModel:
         """
         Model step
         """
+        self.target.move()
+        """
+        0-100 GP 
+        101-200 CMP
+        201-300 GP
+        301-400 CMP
+        401-500 GP
+        501-600 CMP 
+        """
+        CMP = False
 
-        for robot in self.robots:
-            robot.move()
-        # self.plot_positions()
+        if (100 <= t <= 200) or (300 <= t <= 400) or (500 <= t <= 600):
+            CMP = True
+
+        if t == 100 or t == 300 or t == 500:
+            # Assign rank
+            # Create an array of unique numbers from 0 to 3
+            unique_numbers = np.arange(4)
+            # Shuffle the array randomly
+            np.random.shuffle(unique_numbers)
+
+            for i, robot in enumerate(self.robots):
+                robot.rank = unique_numbers[i]
+
+        # if t == 100:
+        #     # random_pos = np.random.uniform(-10,10, (2, 1))
+        #     random_x = np.random.uniform(0, 10)
+        #     random_y = np.random.uniform(0, 10)
+        #     random_pos = np.array([[random_x], [random_y]])
+        #     Target.pos = random_pos
+        #     print("Target.pos = ", random_pos)
+
+        if CMP:
+            # Sort the robots based on their ranks
+            sorted_robots = sorted(self.robots, key=lambda robot: robot.rank)
+
+            for robot in sorted_robots:
+                robot.move(CMP, self.robots, self.A_tilda)
+
+        else:
+            for robot in self.robots:
+                robot.move(CMP, self.robots, self.A_tilda)
+
+        self.plot_positions()
 
         positions = self.get_positions()
         self.xStore[t] = positions
+        self.tStore[t] = self.target.pos
 
-        for robot in self.robots:
-            robot.measure(self.target.pos)
+        if not CMP:
 
-        # Number of consensus protocol msg exchnges:
-        m = 5
-        for k in range(m):
-            A = self.get_topology_matrix()
+            for robot in self.robots:
+                robot.measure(self.target.pos)
 
-            for i in range(self.n_robots):
-                # Compute robot neighborhood
-                robot = self.robots[i]
-                robot_neighborhood = []
-                for j in range(self.n_robots):
-                    if A[i, j]:
-                        robot_neighborhood.append(self.robots[j])
+            # Number of consensus protocol msg exchanges:
+            m = 5
+            for k in range(m):
+                A = self.get_topology_matrix()
 
-                D = np.sum(A, axis=1)
-                robot.share(robot_neighborhood, D)
+                for i in range(self.n_robots):
+                    # Compute robot neighborhood
+                    robot = self.robots[i]
+                    robot_neighborhood = []
+                    for j in range(self.n_robots):
+                        if A[i, j]:
+                            robot_neighborhood.append(self.robots[j])
+
+                    D = np.sum(A, axis=1)
+                    robot.share(robot_neighborhood, D)
 
         if t == self.n_steps - 1:
             # print(self.xStore)
@@ -116,7 +177,9 @@ class HerdModel:
 
     def plot_traj(self):
         # Create a list of colors for each robot's trajectory
-        colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'tab:blue', 'tab:orange', 'tab:purple']
+        colors = ['r', 'b', 'g', 'k', 'm', 'y', 'c', 'tab:blue', 'tab:orange', 'tab:purple']
+
+        legends = []  # List to store legend labels
 
         # Create a figure and axis
         fig, ax = plt.subplots()
@@ -127,14 +190,23 @@ class HerdModel:
             x = [point[0] for point in robot_pos]
             y = [point[1] for point in robot_pos]
             # print(robot_pos)
-            plt.plot(x, y, linestyle='-')
+            legends.append(f'Robot {i}')
+            plt.plot(x, y, linestyle='-', color=colors[i])
+
+        # Extract x and y coordinates from the points of target
+        x = [point[0] for point in self.tStore]
+        y = [point[1] for point in self.tStore]
+
+        legends.append('Target ')
+        plt.plot(x, y, linestyle='-', color='r')
 
         # Add labels and legend
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_title('Robot Trajectories')
-        ax.set_xlim(0, 10)  # Set X-axis limits
-        ax.set_ylim(0, 10)  # Set Y-axis limits
+        ax.set_xlim(0, 20)  # Set X-axis limits
+        ax.set_ylim(0, 20)  # Set Y-axis limits
+        ax.legend(legends)  # Add legend using the labels specified above
         # Show the plot
         plt.show()
 
@@ -166,7 +238,8 @@ class HerdModel:
 
     def plot_positions(self):
         self.ax.clear()  # Clear the previous plot
-        colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']  # You can add more colors as needed
+        # colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']  # You can add more colors as needed
+        colors = ['r', 'b', 'g', 'k', 'm', 'y', 'c', 'tab:blue', 'tab:orange', 'tab:purple']
         legends = []  # List to store legend labels
 
         for i, robot in enumerate(self.robots):
@@ -174,21 +247,30 @@ class HerdModel:
             self.ax.plot(robot.pos[0], robot.pos[1], 'o', markersize=5, label=f'Robot {i}', color=color)
             legends.append(f'Robot {i}')
 
+        self.ax.plot(self.target.pos[0], self.target.pos[1], 'x', markersize=5, label='Target', color='r')
+
         self.ax.set_xlabel('X')
         self.ax.set_ylabel('Y')
         self.ax.set_title('Robot Positions')
-        self.ax.set_xlim(0, 10)  # Set X-axis limits
-        self.ax.set_ylim(0, 10)  # Set Y-axis limits
+        self.ax.set_xlim(0, 20)  # Set X-axis limits
+        self.ax.set_ylim(0, 20)  # Set Y-axis limits
 
         self.ax.legend(legends)  # Add legend using the labels specified above
         plt.pause(0.001)  # Add a small pause (adjust as needed)
 
     def get_A_tilda(self):
-        A_tilda = np.zeros(self.n_robots, self.n_robots)
+        A_tilda = np.zeros([self.n_robots, self.n_robots])
         if self.n_robots == 4:
-            A_tilda[2, 1] = 5.9597
-            A_tilda[3, 2] = 5.3958
-            A_tilda[4, 3] = 6.2602
+            # A_tilda[1, 0] = 5.9597
+            # A_tilda[2, 1] = 5.3958
+            # A_tilda[3, 2] = 6.2602
+            A_tilda[1, 0] = 1
+            A_tilda[2, 1] = 1
+            A_tilda[3, 2] = 1
+            return A_tilda
+
+        if self.n_robots == 2:
+            A_tilda[1, 0] = 1
 
         return A_tilda
 
@@ -224,12 +306,71 @@ class Robot_sheep:
         self.x_est = pos
         self.P_est = np.zeros((2, 2))
         self.p_est_distr = np.zeros((2, 1))
+        self.rank = None
+        self.u = np.array([[0], [0]])
 
-    def move(self):
-        u = self.RobGain * (self.p_est_distr - self.x_est)
-        u = np.clip(u, -0.5, 0.5)
-        self.pos = self.pos + u
-        self.pos_kf(u)
+    # def move(self):
+    #     u = self.RobGain * (self.p_est_distr - self.x_est)
+    #     u = np.clip(u, -0.5, 0.5)
+    #     self.pos = self.pos + u
+    #     self.pos_kf(u)
+
+    def move(self, CMP, robots, A_tilda):
+        if CMP:
+            theta = polar_angle(self.u)
+            v = 0.05
+            if self.rank == 0:
+                u = self.RobGain * (self.p_est_distr - self.x_est)
+                self.u = np.clip(u, -0.5, 0.5)
+                self.pos = self.pos + self.u
+                self.pos_kf(u)
+                return
+
+            counter = 0
+            for robot in robots:
+                if robot == self:
+                    continue
+
+                # diff = self.x_est - robot.x_est
+                diff = self.pos - robot.pos
+
+                diff_norm = np.linalg.norm(diff)
+
+                e_ij = diff / diff_norm
+
+                # Compute the angle in polar coordinates
+                aij = polar_angle(e_ij)
+                gij = -np.sin(aij - polar_angle(self.u))
+                prova1 = polar_angle(robot.u) - polar_angle(self.u)
+                influence = A_tilda[self.rank, robot.rank]
+
+                # gij = np.sin(polar_angle(robot.u) - polar_angle(self.u))
+
+                if gij != 0 and influence != 0:
+                    if diff_norm > 0.3:
+                        v = 1
+                    counter += 1
+
+                theta += A_tilda[self.rank, robot.rank] * gij
+
+            if counter != 0:
+                # new_velocity = np.array([np.cos(theta) * self.pos[0], np.sin(theta) * self.pos[1]])
+                new_velocity = v * np.array([np.cos(theta), np.sin(theta)])
+                self.u = np.clip(new_velocity, -0.5, 0.5)
+                dt = 0.1
+                self.pos += self.u * dt
+
+            self.pos_kf(self.u)
+
+        else:  # GP
+            mean = 0
+            std_dev = 0.1
+            u_random_vector = np.random.normal(mean, std_dev, size=(2, 1))
+            self.u = u_random_vector
+            dt = 0.1
+            self.pos += self.u * dt
+
+            self.pos_kf(self.u)
 
     def measure(self, target_pos):
         s_World = self.get_target_pos(target_pos)
@@ -317,5 +458,22 @@ class Robot_sheep:
 
 
 class Target:
-    def __init__(self, pos=np.array([[9], [5]])):
+    def __init__(self, At, Bt, pos=np.array([[1.], [5.]])):
         self.pos = pos
+        self.u = np.array([[0.3], [0.1]])
+        self.At = At
+        self.Bt = Bt
+
+    def move(self):
+        dt = 0.1
+        # Human being dynamics
+        ProbChangeDir = 0.01
+        if np.random.rand() < ProbChangeDir:
+            uHuman = (np.random.rand(2) - 0.5) * 0.3
+            uHuman = uHuman.reshape(-1, 1)
+            print(self.pos)
+            print("uHuman ", uHuman)
+            # uHuman will be a NumPy array containing 2 random values between -0.15 and 0.15
+
+            self.u += uHuman
+        self.pos += self.u * dt

@@ -1,8 +1,8 @@
 from model import *
 
 if __name__ == '__main__':
-    n_steps = 300
-    model = HerdModel(n_robots=10, n_steps = n_steps)
+    n_steps = 600
+    model = HerdModel(n_robots=4, n_steps = n_steps)
 
     for i in range(n_steps):
         model.step(i)
