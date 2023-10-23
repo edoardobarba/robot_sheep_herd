@@ -2,18 +2,13 @@ import numpy as np
 import matplotlib
 from RobotSheep import *
 
-from time import sleep
-
 matplotlib.use('TkAgg')  # Replace 'TkAgg' with the backend of your choice
 import matplotlib.pyplot as plt
 
 
 class HerdModel:
-    """
-    A model for simulation of the evolution.
-    """
 
-    def __init__(self, n_robots: int, scale_R, n_steps, show_sim, fixed_target, connections, CR=1000):
+    def __init__(self, n_robots: int, scale_R, n_steps, show_sim, fixed_target, connections):
         """
         HerdModel init function
 
@@ -25,16 +20,13 @@ class HerdModel:
         self.y_size = 60
 
         # Target kinematic model
-        # Define Ah as a 2x2 identity matrix
+        # Define At as a 2x2 identity matrix
         self.At = np.eye(2)
-        # self.At[0][0] = 1.1
         # Define Bh as a 2x2 identity matrix (assuming you have 2 inputs)
         self.Bt = np.eye(2)
 
         self.num_agents = n_robots
         self.current_id = 0
-        self.CR = CR
-        # self.x_Store = [np.empty((2)) for _ in range(n_robots)]
 
         self.n_robots = n_robots
 
@@ -80,7 +72,8 @@ class HerdModel:
             robot.aiStore = None
 
     def add_target(self):
-        self.target = Target(At=self.At, Bt=self.Bt, fixed=self.fixed_target, x_size=self.x_size, y_size=self.y_size, initial_pos=np.array([[10.], [30.]]))
+        self.target = Target(At=self.At, Bt=self.Bt, fixed=self.fixed_target, x_size=self.x_size, y_size=self.y_size,
+                             initial_pos=np.array([[10.], [30.]]))
 
     def add_agents(self, n_robots, scale_R):
         """
@@ -89,10 +82,12 @@ class HerdModel:
         """
 
         for i in range(n_robots):
-            if i == 0:
-                scale_R = 10
-            else:
-                scale_R = 1000
+
+            # if i == 0:
+            #     scale_R = 10
+            # else:
+            #     scale_R = 1000
+
             # Sensor Covariance
             Ri = scale_R * (np.random.rand(2, 2) - 0.5)
             # Calculate the covariance matrix by multiplying the matrix with its transpose
@@ -118,10 +113,11 @@ class HerdModel:
             R_GPS = np.dot(R_GPS, R_GPS.T)
 
             # random_pos = np.random.uniform(-10,10, (2, 1))
-            random_x = 2 + np.random.uniform(0, 3)
-            random_y = 2 + np.random.uniform(0, 3)
+            random_x = np.random.uniform(2, 5)
+            random_y = np.random.uniform(2, 5)
             random_pos = np.array([[random_x], [random_y]])
-            robot = Robot_sheep(unique_id=i, pos=random_pos, Ri=Ri, Hi=Hi, Qi=Qi, R_GPS=R_GPS, CR=self.CR, At=self.At, Bt=self.Bt, fixed_target=self.fixed_target, n_robots=self.n_robots)
+            robot = RobotSheep(unique_id=i, pos=random_pos, Ri=Ri, Hi=Hi, Qi=Qi, R_GPS=R_GPS, At=self.At,
+                                Bt=self.Bt, fixed_target=self.fixed_target, n_robots=self.n_robots)
 
             # print(robot.pos)
             self.robots[i] = robot
@@ -133,25 +129,15 @@ class HerdModel:
         """
         if not self.target.fixed:
             self.target.move()
-        """
-        0-100 GP 
-        101-200 CMP
-        201-300 GP
-        301-400 CMP
-        401-500 GP
-        501-600 CMP 
-        """
+
         if self.show_sim:
             positions = self.get_positions()
             velocities = self.get_velocities()
             self.xStore.append(positions)
             self.uStore[t] = velocities
             self.tStore[t] = self.target.pos
-        # self.CMP = False
-        # if (100 <= t <= 200) or (300 <= t <= 400) or (500 <= t <= 600):
-        #     self.CMP = True
 
-        if t == 0:  # or t == 100 or t == 300 or t == 500:
+        if t == 0:
             # Assign rank
             # Create an array of unique numbers from 0 to 3
             unique_numbers = np.arange(self.n_robots)
@@ -163,6 +149,8 @@ class HerdModel:
 
         # Sort the robots based on their ranks
         sorted_robots = sorted(self.robots, key=lambda robot: robot.rank)
+
+        #Alternate CMP and GP
         if t % 50 == 0:
             self.CMP = False
 
@@ -170,53 +158,35 @@ class HerdModel:
             self.CMP = True
             self.assign_rank()
 
-        # if self.CMP:
-        # print("Target pos: ")
-        # print(self.target.pos)
         for robot in sorted_robots:
             reached = robot.move(self.CMP, self.robots, self.A_tilda, self.target.pos)
             if self.fixed_target and reached:
-                # if self.show_sim:
-                #     self.plot_history_pos()
-                #     self.plot_traj()
                 return True
 
 
-        if not self.CMP or self.CMP:  # They communicate only during GP
-            if not self.fixed_target:
-                for robot in self.robots:
-                    robot.predict()
-
+        if not self.fixed_target:
             for robot in self.robots:
-                robot.measure(self.target.pos)
+                robot.predict()
 
-            # Number of consensus protocol msg exchanges:
-            m = 5
-            for k in range(m):
-                # A = self.get_topology_matrix(self.connections)
+        for robot in self.robots:
+            robot.measure(self.target.pos)
 
-                for i in range(self.n_robots):
+        # Number of consensus protocol msg exchanges:
+        m = 5
+        for k in range(m):
+            for i in range(self.n_robots):
 
-                    # Compute robot neighborhood
-                    robot = self.robots[i]
-                    # self.plot_positions()
-                    robot_neighborhood = []
-                    for j in range(self.n_robots):
-                        if self.A[i, j]:
-                            robot_neighborhood.append(self.robots[j])
+                # Compute robot neighborhood
+                robot = self.robots[i]
+                # self.plot_positions()
+                robot_neighborhood = []
+                for j in range(self.n_robots):
+                    if self.A[i, j]:
+                        robot_neighborhood.append(self.robots[j])
 
-                    D = np.sum(self.A, axis=1)
-                    # print("t= ", t)
-                    # if(k==m-1):
-                    #    print(np.linalg.norm(robot.p_est_distr-self.target.pos))
+                D = np.sum(self.A, axis=1)
 
-                    robot.share(robot_neighborhood, D, self.target.pos)
-
-        # if t == self.n_steps - 1:
-        # print(self.xStore)
-        # self.print_data()
-        # self.plot_history_pos()
-        # self.plot_traj()
+                robot.share(robot_neighborhood, D, self.target.pos)
 
         return False
 
@@ -228,7 +198,7 @@ class HerdModel:
 
         # Create a figure and axis
         fig, ax = plt.subplots(figsize=(10, 5))
-        #print(self.xStore)
+        # print(self.xStore)
 
         for i in range(self.n_robots):
             robot_pos = [positions[i] for positions in self.xStore]
@@ -245,7 +215,7 @@ class HerdModel:
             x = self.tStore[0][0]
             y = self.tStore[0][1]
             # legends.append('Target ')
-            plt.scatter(x, y, s=2500, marker='o', facecolors='none', edgecolors='r',  label='Target')
+            plt.scatter(x, y, s=2500, marker='o', facecolors='none', edgecolors='r', label='Target')
             # plt.plot(x, y, 'o',  markersize=10, color='r', label='Target')
         else:
             x = [point[0] for point in self.tStore]
@@ -308,13 +278,11 @@ class HerdModel:
 
     def plot_history_pos(self):
 
-        # colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']  # You can add more colors as needed
         colors = ['c', 'tab:orange', 'g', 'y']
         legends = []  # List to store legend labels
 
         # Create a figure and axis
         fig, ax = plt.subplots(figsize=(10, 5))
-
 
         for i in range(self.n_steps):
             ax.clear()
@@ -327,7 +295,6 @@ class HerdModel:
                 # plt.quiver(x, y, self.uStore[i][j][0], self.uStore[i][j][1], angles='xy', scale_units='xy', scale=0.4,
                 # color=color, label='Velocity Vector', headlength=1,  # Length of the arrowhead
                 # headwidth=1)
-                # Add labels and legend
 
             # plt.plot(self.tStore[i][0], self.tStore[i][1], 'o', markersize=10, label='Target', color='r')
             plt.scatter(self.tStore[i][0], self.tStore[i][1], s=2500, label='Target', marker='o', facecolors='none',
@@ -344,9 +311,6 @@ class HerdModel:
             plt.pause(0.1)
 
         plt.close()
-
-        # # Show the plot
-        # plt.show()
 
     def plot_positions(self):
         self.ax.clear()  # Clear the previous plot
@@ -376,50 +340,11 @@ class HerdModel:
         for i in range(self.n_robots - 1):
             A_tilda[i + 1, i] = 1
 
-        # A_tilda[2,0] = 1
-        # A_tilda[3,0] = 1
-        # if self.n_robots == 4:
-        #     # A_tilda[1, 0] = 5.9597
-        #     # A_tilda[2, 1] = 5.3958
-        #     # A_tilda[3, 2] = 6.2602
-        #     A_tilda[1, 0] = 1
-        #     A_tilda[2, 1] = 1
-        #     A_tilda[3, 2] = 1
-        #     return A_tilda
-        #
-        # if self.n_robots == 2:
-        #     A_tilda[1, 0] = 1
-
         return A_tilda
 
-    # def assign_rank(self, leader):
-    #     # Assign rank
-    #     # Create an array of unique numbers from 0 to 3
-    #     unique_numbers = np.arange(1, self.n_robots)
-    #
-    #     # Shuffle the array randomly
-    #     np.random.shuffle(unique_numbers)
-    #
-    #     for i, robot in enumerate(self.robots):
-    #         if robot.unique_id == leader:
-    #             robot.rank = 0
-    #         else:
-    #             robot.rank, unique_numbers = unique_numbers[-1], unique_numbers[:-1]
-
     def assign_rank(self):
-        # # Assign rank
-        # # Create an array of unique numbers from 0 to n_robots-1
-        # unique_numbers = np.arange(self.n_robots - 1, -1, -1)
-        # leader_pos = leader.pos
-        #
-        # # Sort robots by distance to the leader
-        # self.robots = sorted(self.robots, key=lambda robot: np.linalg.norm(robot.pos - leader_pos))
-        #
-        # # Assign ranks
-        # for i, robot in enumerate(self.robots):
-        #     robot.rank = unique_numbers[i]
         # Assign rank
-        # Create an array of unique numbers from 0 to 3
+        # Create an array of unique numbers from 0 to n_robots
         unique_numbers = np.arange(self.n_robots)
         # Shuffle the array randomly
         np.random.shuffle(unique_numbers)
@@ -433,48 +358,6 @@ class HerdModel:
             robot_target_dist = np.linalg.norm(robot.pos - self.target.pos)
             dist.append(robot_target_dist)
         return np.mean(np.array(dist))
-
-
-# class Target:
-#     def __init__(self, x_size, y_size, At=np.eye(2), Bt=np.eye(2), initial_pos=np.array([[10.], [30.]]), fixed=True):
-#         if fixed:
-#             x = 100 + np.random.uniform(0, 10)  # 100-110
-#             y = np.random.uniform(5, 55)
-#             self.pos = np.array([[x], [y]])
-#             # print(self.pos)
-#         else:
-#             self.pos = initial_pos
-#         self.u = np.array([[0.2], [0.]])
-#         self.At = At
-#         self.Bt = Bt
-#         self.fixed = fixed
-#         self.changed_pos = False
-#         self.x_size = x_size
-#         self.y_size = y_size
-#
-#     def move(self):
-#
-#         dt = 1
-#         # Human being dynamics
-#         ProbChangeDir = 0.1
-#         # if self.pos[0] > 95 or self.pos[0] < 5 or self.pos[1] > 45 or self.pos[1] < 5:
-#         # ProbChangeDir = 0.3
-#
-#         if np.random.rand() < ProbChangeDir:
-#             uTarget = (np.random.rand(2) - 0.5) / 10
-#             uTarget = uTarget.reshape(-1, 1)
-#             # uHuman will be a NumPy array containing 2 random values between -0.15 and 0.15
-#
-#             self.u += uTarget
-#             self.u = np.clip(self.u, -1, 1)
-#         self.pos += self.u * dt
-#
-#         # Enforce boundaries
-#         self.pos[0] = np.clip(self.pos[0], 10, 100)  # Bound x within 0-100
-#         self.pos[1] = np.clip(self.pos[1], 10, 50)
-
-
-
 
 
 class Target:
@@ -520,10 +403,4 @@ class Target:
 
         # Update velocity using the dynamics equation
         self.pos = np.dot(self.At, self.pos) + np.dot(self.Bt, control_input)
-        # self.velocity[0] = max(0.1, self.velocity[0])  # Ensure x velocity is non-negative
-        #self.velocity = np.clip(self.velocity, -self.max_velocity, self.max_velocity)
-
-        # Update position based on the velocity
-        #self.pos += self.velocity * dt
         self.apply_boundary_constraints()
-

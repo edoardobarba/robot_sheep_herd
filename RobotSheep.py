@@ -9,20 +9,27 @@ def polar_angle(vector):
     angle_rad = np.mod(angle_rad, 2 * np.pi)
     return angle_rad
 
-p_est = []
 
-class Robot_sheep:
-    def __init__(self, unique_id, pos, Ri, Hi, Qi, R_GPS, CR, At, Bt, fixed_target, n_robots, RobGain=0.1):
+class RobotSheep:
+    def __init__(self, unique_id, pos, Ri, Hi, Qi, R_GPS, At, Bt, fixed_target, n_robots, RobGain=0.1, target_radius = 5):
         """
-        Robot_sheep Agent init function
+        Initialize a RobotSheep agent.
 
-        :param CR: maximum distance radio of interaction with other agents
-        :param Ri: Uncertainty
-        :param Qi: Input uncertainty
-        :param Hi: Sensor model
+        Parameters:
+            - unique_id (int): A unique identifier for the robot.
+            - pos (tuple): Initial position (x, y) of the robot.
+            - Ri (float): Uncertainty associated with robot position measurements.
+            - Hi (function): Sensor model for the robot's position measurements.
+            - Qi (float): Input control uncertainty.
+            - R_GPS (float): Uncertainty in the GPS measurements.
+            - At (numpy array): Transition matrix for the Kalman filter.
+            - Bt (numpy array): Control input matrix for the Kalman filter.
+            - fixed_target (bool): True if the target is fixed, False if it's dynamic.
+            - n_robots (int): Total number of robots in the simulation.
+            - RobGain (float, optional): Gain for robot motion control (default is 0.1).
         """
+
         self.unique_id = unique_id
-        self.CR = CR
 
         self.fixed_target = fixed_target
         self.n_robots = n_robots
@@ -32,6 +39,7 @@ class Robot_sheep:
         self.Qi = Qi
         self.R_GPS = R_GPS
         self.RobGain = RobGain
+        self.target_radius = target_radius
 
         self.Fi = None
         self.ai = None
@@ -51,30 +59,18 @@ class Robot_sheep:
         self.P_est = np.zeros((2, 2))
         # Uncertainty on the initial location of the target
         self.p_est_distr = np.array([[10.], [30.]])
-        #self.p_est_distr = np.zeros((2, 1))
+        # self.p_est_distr = np.zeros((2, 1))
         # Uncertainty on the initial location of the target
-        #self.Th_KF = np.eye(2)
+        # self.Th_KF = np.eye(2)
         self.Th_KF = np.eye(2)
-        #np.fill_diagonal(self.Th_KF, [(120 / 3) ** 2, (60 / 3) ** 2]) # initiallly 120x60m region
+        # np.fill_diagonal(self.Th_KF, [(120 / 3) ** 2, (60 / 3) ** 2]) # initiallly 120x60m region
         np.fill_diagonal(self.Th_KF, [0, 0])
-
-        # self.Th_KF = (10 / 3) ** 2 * np.eye(2)  # initiallly 10x10m region (0-10 x  and 0-10 y)
 
         # Uncertainty in target motion
         self.Qt = np.eye(2)
         # np.fill_diagonal(self.Qt, [0, (0.5 / 3) ** 2])
         np.fill_diagonal(self.Qt, [0, (0.5 / 3) ** 2])
-        #self.Qt = (0.5 / 3) ** 2 * np.eye(2)
-        #print(self.Qt)
-
-        # %idea of the motion of human (we assume that in 100ms
-        # %the robot can travel 4+- 3 meters with 99% probability)
-        # %We need to understand where the human will be after 100ms. If p is the
-        # %location of the human, we  need to understand the neighbour of p in which
-        # %the human will be, with a certain probability. If we assume that human is
-        # %moving with bidir gaussian pdf, we assume that the robot moves at most at
-        # %3 sigma. 3sigma should be 15cm if we assume that in 1 second a person
-        # %moves 1.5 m. so the variance is 25cm^2.
+        # self.Qt = (0.5 / 3) ** 2 * np.eye(2)
 
         self.rank = None
         self.u = np.array([[0.], [0.]])
@@ -86,12 +82,11 @@ class Robot_sheep:
         if CMP:
             return self.move_as_CMP(robots, A_tilda, dt, target_pos)
         else:  # GP
-            return self.move_as_GP(A_tilda)
+            return self.move_as_GP()
 
     def move_as_CMP(self, robots, A_tilda, dt, target_pos):
         self.GP_step_count = 0
         theta = polar_angle(self.u)
-        v = 0.1
 
         if self.rank == 0:
             v = 1
@@ -103,13 +98,12 @@ class Robot_sheep:
             theta += gij
 
             new_u = v * np.array([np.cos(theta), np.sin(theta)])
-            #self.u = np.clip(new_u, -1, 1)
             self.u = new_u
             self.pos += self.u * dt
 
             self.pos_kf(self.u)
-            if np.linalg.norm(self.pos-target_pos)< 5:
-                #print("sono qui")
+            if np.linalg.norm(self.pos - target_pos) < 5:
+                # print("sono qui")
                 return True
             return False
         # Define noise parameters
@@ -129,46 +123,42 @@ class Robot_sheep:
             aij = polar_angle(e_ij)
             g_vel = np.sin(polar_angle(robot.u) - polar_angle(self.u))
             gij = -np.sin(aij - polar_angle(self.u))
-            e_theta = np.array([np.cos(self.u[0])*self.pos[0], np.sin(self.u[1])*self.pos[1]])
-            # print("diff_norm ", diff_norm)
-            # print("dot ", np.dot(e_ij.reshape(2,), e_theta.reshape(2,)))
-            # print("cos ", np.cos(np.pi/2))
+            # e_theta = np.array([np.cos(self.u[0]) * self.pos[0], np.sin(self.u[1]) * self.pos[1]])
 
-            #A_ij = 1 if (diff_norm <= 5) else 0 #and (np.dot(e_ij.reshape(2,), e_theta.reshape(2,)) > np.cos(np.pi/2)) else 0
-            #print(A_ij)
             A_ij = 1
             influence = A_tilda[self.rank, robot.rank] * A_ij
 
             if influence != 0:
-                v = 1 if diff_norm > 2 else 0.5
                 counter += 1
 
             # Add delta-correlated noise at each time step
-            noise = np.random.normal(0, 1)  # You can adjust the noise parameters as needed
+
             theta_dot_vel += influence * g_vel
             theta_dot += influence * gij
 
+        noise = np.random.normal(0, 1)  # You can adjust the noise parameters as needed
         # Add the accumulated delta-correlated noise to theta_dot
-        # theta_dot += D_theta * noise
+        theta_dot += D_theta * noise
 
         theta += theta_dot
 
         if counter != 0:
-            new_u = 0.7 * np.array([np.cos(theta), np.sin(theta)]) + 0.3 * np.array([np.cos(theta_dot_vel), np.sin(theta_dot_vel)])
-            #self.u = np.clip(new_u, -1, 1)
+            new_u = 0.7 * np.array([np.cos(theta), np.sin(theta)]) + 0.3 * np.array(
+                [np.cos(theta_dot_vel), np.sin(theta_dot_vel)])
+            # self.u = np.clip(new_u, -1, 1)
             self.u = new_u
             self.pos += self.u * dt
 
         self.pos_kf(self.u)
         return False
 
-    def move_as_GP(self, A_tilda):
+    def move_as_GP(self):
         self.GP_step_count += 0.000001
         probCMP = np.sqrt(self.GP_step_count)
         rand = random.uniform(0, 1)
 
         if rand < probCMP:
-            #print("HERE")
+            # print("HERE")
             return False
 
         mean = 0
@@ -189,27 +179,19 @@ class Robot_sheep:
         s_World = self.get_target_pos(target_pos)
         self.measure_target_pos(s_World)
 
-
-
     def predict(self):
         self.p_est_distr = self.At @ self.p_est_distr + self.Bt @ self.Ut
-        #print(self.p_est_distr)
-
         self.Th_KF = self.At @ self.Th_KF @ self.At.T + self.Qt
-        #print(self.Th_KF)
         return
 
-    def share(self, robot_neighborhood, D,target_pos):
-        # for j in range(len(robot_neighborhood)):
-        #     self.Fi = self.Fi + 1 / ((1 + max(D)) * (robot_neighborhood[j].FiStore - self.FiStore))
-        #     self.ai = self.ai + 1 / ((1 + max(D)) * (robot_neighborhood[j].aiStore - self.aiStore))
+    def share(self, robot_neighborhood, D, target_pos):
         self.FiStore = self.Fi
         self.aiStore = self.ai
         for j in range(len(robot_neighborhood)):
             self.Fi = self.Fi + (1 / (1 + max(D)) * (robot_neighborhood[j].FiStore - self.FiStore))
             self.ai = self.ai + (1 / (1 + max(D)) * (robot_neighborhood[j].aiStore - self.aiStore))
 
-        self.update_target_est(target_pos)
+        self.update_target_est()
         return
 
     def get_target_pos(self, target_pos):
@@ -217,11 +199,7 @@ class Robot_sheep:
         t_pos_robot_frame = target_pos - self.pos
 
         # Sensor (measure of the position + uncertainty(0 mean, Ri covariance))
-
-        # prova = self.Hi @ t_pos_robot_frame
-        # prova2 = np.random.multivariate_normal([0, 0], self.Ri).reshape((-1, 1))
         s = self.Hi @ t_pos_robot_frame + np.random.multivariate_normal([0, 0], self.Ri).reshape((-1, 1))
-
         # Transform the robot measurements into world measurements (the common reference frame for all the robots)
         s_World = s + self.Hi @ self.x_est
         return s_World
@@ -231,20 +209,18 @@ class Robot_sheep:
         zi = s_World
         self.Fi = self.Hi.T @ np.linalg.inv(self.Ri + self.Hi @ self.P_est @ self.Hi.T) @ self.Hi
         self.ai = self.Hi.T @ np.linalg.inv(self.Ri + self.Hi @ self.P_est @ self.Hi.T) @ zi
-        # if self.unique_id == 0:
-        #    print(self.Fi)
 
         self.FiStore = self.Fi
         self.aiStore = self.ai
 
-    def update_target_est(self, target_pos):
+    def update_target_est(self):
         if self.fixed_target:
             self.p_est_distr = np.linalg.inv(self.Fi) @ self.ai
             return
 
         PredP = self.Th_KF
         self.Th_KF = np.linalg.inv(self.Th_KF + self.n_robots * self.Fi)
-        self.p_est_distr = self.Th_KF @ (PredP@self.p_est_distr + self.n_robots * self.ai)
+        self.p_est_distr = self.Th_KF @ (PredP @ self.p_est_distr + self.n_robots * self.ai)
 
         return
 
@@ -252,10 +228,9 @@ class Robot_sheep:
         # Update estimated position
         random_vector = np.random.multivariate_normal([0, 0], self.Qi).reshape((-1, 1))
         uUnc = u + random_vector
-        #uUnc = np.clip(uUnc, -1, 1)
+        # uUnc = np.clip(uUnc, -1, 1)
         self.x_est = self.x_est + uUnc
         self.P_est = self.P_est + self.Qi
-
 
         # Measurements update
         # assume we have a gps that gives to each robot its own locations
