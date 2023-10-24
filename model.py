@@ -10,8 +10,17 @@ class HerdModel:
 
     def __init__(self, n_robots: int, scale_R, max_steps, show_sim, fixed_target, connections, width=120, height=60):
         """
-        HerdModel init function
+               Initialize the HerdModel.
 
+               Parameters:
+               - n_robots (int): The number of robots in the model.
+               - scale_R: ...  # Describe the purpose of scale_R here.
+               - max_steps (int): The maximum number of simulation steps.
+               - show_sim (bool): A flag to control whether to display the simulation.
+               - fixed_target (bool): A flag indicating whether the target is fixed.
+               - connections: ...  # Describe the purpose of connections here.
+               - width (int): The width of the simulation area.
+               - height (int): The height of the simulation area.
         """
         self.robots = np.empty(n_robots, dtype=object)
         self.target = None
@@ -52,32 +61,38 @@ class HerdModel:
 
         # print("TARGET POS: ", self.target.pos)
 
-    def reset_robots(self):
-        if self.fixed_target:
-            for robot in self.robots:
-                robot.Fi = None
-                robot.ai = None
-
-                robot.FiStore = None
-                robot.aiStore = None
-                robot.p_est_distr = np.zeros((2, 1))
-                return
-
-        for robot in self.robots:
-            robot.Fi = None
-            robot.ai = None
-
-            robot.FiStore = None
-            robot.aiStore = None
+    # def reset_robots(self):
+    #     if self.fixed_target:
+    #         for robot in self.robots:
+    #             robot.Fi = None
+    #             robot.ai = None
+    #
+    #             robot.FiStore = None
+    #             robot.aiStore = None
+    #             robot.p_est_distr = np.zeros((2, 1))
+    #             return
+    #
+    #     for robot in self.robots:
+    #         robot.Fi = None
+    #         robot.ai = None
+    #
+    #         robot.FiStore = None
+    #         robot.aiStore = None
 
     def add_target(self):
+        """
+        Add a target to the simulation.
+        """
         self.target = Target(At=self.At, Bt=self.Bt, fixed=self.fixed_target, x_size=self.x_size, y_size=self.y_size,
                              initial_pos=np.array([[10.], [30.]]))
 
     def add_agents(self, n_robots, scale_R):
         """
-        Add agents to the model.
-        :type n_robots: int
+        Add agents (robots) to the simulation.
+
+        Parameters:
+        - n_robots (int): The number of robots to add.
+        - scale_R (int): scaling factor for covariance matrix Ri.
         """
 
         for i in range(n_robots):
@@ -124,8 +139,12 @@ class HerdModel:
 
     def step(self, t):
         """
-        Model step
+        Perform a simulation step.
+
+        Parameters:
+        - t (int): The current simulation step.
         """
+
         if not self.target.fixed:
             self.target.move()
 
@@ -188,6 +207,9 @@ class HerdModel:
         return False
 
     def plot_traj(self):
+        """
+        Plot trajectories of robots and the target.
+        """
         # Create a list of colors for each robot's trajectory
         colors = ['c', 'tab:orange', 'g', 'y']
 
@@ -231,6 +253,15 @@ class HerdModel:
         plt.show()
 
     def get_topology_matrix(self, connections):
+        """
+          Generate a topology matrix based on the specified number of connections.
+
+          Parameters:
+          - connections: number of bidirectional connections between robots
+
+          Returns:
+          - A (numpy.ndarray): The topology matrix.
+        """
         # Topology matrix
         A = np.zeros([self.n_robots, self.n_robots])
         # for i in range(self.n_robots):
@@ -249,35 +280,43 @@ class HerdModel:
         #     A[1, 3] = 1
         # if connections == 6:
         #     A[2, 3] = 1
-
+        counter = 0
         for i in range(self.n_robots - 1):
             for j in range(i + 1, self.n_robots):
                 A[i, j] = 1
+                counter += 1
+                if counter == connections:
+                    return A + A.T
 
         A = A + A.T
-        # print(A)
 
         return A
 
     def get_positions(self):
+        """
+        Get the current positions of all robots.
+
+        Returns:
+        - numpy.ndarray: An array containing the positions of all robots.
+        """
         return np.array([robot.pos for robot in self.robots])
 
     def get_velocities(self):
+        """
+        Get the current velocities of all robots.
+
+        Returns:
+        - numpy.ndarray: An array containing the velocities of all robots.
+        """
         return np.array([robot.u for robot in self.robots])
 
-    def print_data(self):
-        positions = self.get_positions()
-        # Define the reference point
-        reference_point = self.target.pos
-        # Calculate the distances from the reference point to all robot positions
-        distances = np.linalg.norm(positions - reference_point, axis=1)
-
-        # Calculate the mean distance
-        mean_distance = np.mean(distances)
-
-        print("Mean Distance from (9, 5):", mean_distance)
-
     def plot_history_pos(self, last_step):
+        """
+        Plot the history of robot positions up to the specified step.
+
+        Parameters:
+        - last_step (int): The last step to include in the plot.
+        """
 
         colors = ['c', 'tab:orange', 'g', 'y']
         legends = []  # List to store legend labels
@@ -315,30 +354,39 @@ class HerdModel:
 
         plt.close()
 
-    def plot_positions(self):
-        self.ax.clear()  # Clear the previous plot
-        # colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']  # You can add more colors as needed
-        colors = ['c', 'tab:orange', 'g', 'y']
-        legends = []  # List to store legend labels
-        self.ax.set_xlim(0, self.x_size)  # Set X-axis limits
-        self.ax.set_ylim(0, self.y_size)  # Set Y-axis limits
-
-        for i, robot in enumerate(self.robots):
-            color = colors[i % len(colors)]  # Cycle through colors if there are more robots than colors
-            self.ax.plot(robot.pos[0], robot.pos[1], 'o', markersize=5, label=f'Robot {i}', color=color)
-            self.ax.plot(robot.p_est_distr[0], robot.p_est_distr[1], 'x', markersize=5, color=color)
-            legends.append(f'Robot {i}')
-
-        # self.ax.plot(self.target.pos[0], self.target.pos[1], linestyle='o', markersize=10, label='Target', color='r')
-        self.ax.scatter(self.target.pos[0], self.target.pos[1], s=1000, marker='o', facecolors='none', edgecolors='r')
-        self.ax.set_xlabel('X')
-        self.ax.set_ylabel('Y')
-        self.ax.set_title('Robot Positions')
-
-        # self.ax.legend(legends)  # Add legend using the labels specified above
-        plt.pause(0.01)  # Add a small pause (adjust as needed)
+    # def plot_positions(self):
+    #     """
+    #     Plot the current positions of robots and the target.
+    #     """
+    #     self.ax.clear()  # Clear the previous plot
+    #     # colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']  # You can add more colors as needed
+    #     colors = ['c', 'tab:orange', 'g', 'y']
+    #     legends = []  # List to store legend labels
+    #     self.ax.set_xlim(0, self.x_size)  # Set X-axis limits
+    #     self.ax.set_ylim(0, self.y_size)  # Set Y-axis limits
+    #
+    #     for i, robot in enumerate(self.robots):
+    #         color = colors[i % len(colors)]  # Cycle through colors if there are more robots than colors
+    #         self.ax.plot(robot.pos[0], robot.pos[1], 'o', markersize=5, label=f'Robot {i}', color=color)
+    #         self.ax.plot(robot.p_est_distr[0], robot.p_est_distr[1], 'x', markersize=5, color=color)
+    #         legends.append(f'Robot {i}')
+    #
+    #     # self.ax.plot(self.target.pos[0], self.target.pos[1], linestyle='o', markersize=10, label='Target', color='r')
+    #     self.ax.scatter(self.target.pos[0], self.target.pos[1], s=1000, marker='o', facecolors='none', edgecolors='r')
+    #     self.ax.set_xlabel('X')
+    #     self.ax.set_ylabel('Y')
+    #     self.ax.set_title('Robot Positions')
+    #
+    #     # self.ax.legend(legends)  # Add legend using the labels specified above
+    #     plt.pause(0.01)  # Add a small pause (adjust as needed)
 
     def get_A_tilda(self):
+        """
+        Generate the A_tilda matrix used in the simulation.
+
+        Returns:
+        - numpy.ndarray: The A_tilda matrix.
+        """
         A_tilda = np.zeros([self.n_robots, self.n_robots])
         for i in range(self.n_robots - 1):
             A_tilda[i + 1, i] = 1
@@ -346,6 +394,9 @@ class HerdModel:
         return A_tilda
 
     def assign_rank(self):
+        """
+        Assign ranks to robots based on a random shuffle.
+        """
         # Assign rank
         # Create an array of unique numbers from 0 to n_robots
         unique_numbers = np.arange(self.n_robots)
@@ -356,6 +407,12 @@ class HerdModel:
             robot.rank = unique_numbers[i]
 
     def get_avg_dist(self):
+        """
+        Calculate the average distance of robots from the target.
+
+        Returns:
+        - float: The average distance.
+        """
         dist = []
         for robot in self.robots:
             robot_target_dist = np.linalg.norm(robot.pos - self.target.pos)
@@ -365,6 +422,18 @@ class HerdModel:
 
 class Target:
     def __init__(self, x_size, y_size, fixed, At=None, Bt=None, initial_pos=np.array([[10.], [30.]]), max_velocity=0.5):
+        """
+        Initialize a Target object.
+
+        Args:
+            x_size (int): The X-axis size of the environment.
+            y_size (int): The Y-axis size of the environment.
+            fixed (bool): Indicates whether the target is fixed.
+            At (ndarray, optional): The dynamics matrix (2x2). Default is the 2x2 identity matrix.
+            Bt (ndarray, optional): The control matrix (2x2). Default is the 2x2 identity matrix.
+            initial_pos (ndarray, optional): The initial position of the target. Default is [10, 30].
+            max_velocity (float, optional): The maximum allowed velocity for the target. Default is 0.5.
+        """
         if fixed:
             x = np.random.uniform(100, 110)  # 100-110
             y = np.random.uniform(5, 55)
@@ -390,10 +459,18 @@ class Target:
             self.Bt = Bt
 
     def apply_boundary_constraints(self):
+        """
+        Apply boundary constraints to keep the target within the environment bounds.
+        """
         self.pos[0] = np.clip(self.pos[0], 10, self.x_size - 10)  # Bound x within 10-x_size
         self.pos[1] = np.clip(self.pos[1], 10, self.y_size - 10)  # Bound y within 10-y_size
 
     def move(self):
+        """
+        Simulate a movement step for the target.
+
+        This method updates the target's position based on random control input and dynamics.
+        """
         dt = 1
         self.apply_boundary_constraints()
 
@@ -405,5 +482,5 @@ class Target:
         control_input[0] = 0.3
 
         # Update velocity using the dynamics equation
-        self.pos = np.dot(self.At, self.pos) + np.dot(self.Bt, control_input)
+        self.pos = dt * (np.dot(self.At, self.pos) + np.dot(self.Bt, control_input))
         self.apply_boundary_constraints()
