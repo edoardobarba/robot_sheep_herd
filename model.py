@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 class HerdModel:
 
-    def __init__(self, n_robots: int, scale_R, n_steps, show_sim, fixed_target, connections):
+    def __init__(self, n_robots: int, scale_R, n_steps, show_sim, fixed_target, connections, width=120, height=60):
         """
         HerdModel init function
 
@@ -16,8 +16,8 @@ class HerdModel:
         self.robots = np.empty(n_robots, dtype=object)
         self.target = None
         self.fixed_target = fixed_target
-        self.x_size = 120
-        self.y_size = 60
+        self.x_size = width
+        self.y_size = height
 
         # Target kinematic model
         # Define At as a 2x2 identity matrix
@@ -117,7 +117,7 @@ class HerdModel:
             random_y = np.random.uniform(2, 5)
             random_pos = np.array([[random_x], [random_y]])
             robot = RobotSheep(unique_id=i, pos=random_pos, Ri=Ri, Hi=Hi, Qi=Qi, R_GPS=R_GPS, At=self.At,
-                                Bt=self.Bt, fixed_target=self.fixed_target, n_robots=self.n_robots)
+                               Bt=self.Bt, fixed_target=self.fixed_target, n_robots=self.n_robots)
 
             # print(robot.pos)
             self.robots[i] = robot
@@ -150,7 +150,7 @@ class HerdModel:
         # Sort the robots based on their ranks
         sorted_robots = sorted(self.robots, key=lambda robot: robot.rank)
 
-        #Alternate CMP and GP
+        # Alternate CMP and GP
         if t % 50 == 0:
             self.CMP = False
 
@@ -162,7 +162,6 @@ class HerdModel:
             reached = robot.move(self.CMP, self.robots, self.A_tilda, self.target.pos)
             if self.fixed_target and reached:
                 return True
-
 
         if not self.fixed_target:
             for robot in self.robots:
@@ -302,8 +301,8 @@ class HerdModel:
             ax.set_xlabel('X[m]')
             ax.set_ylabel('Y[m]')
 
-            ax.set_xlim(0, 120)  # Set X-axis limits
-            ax.set_ylim(0, 60)  # Set Y-axis limits
+            ax.set_xlim(0, self.x_size)  # Set X-axis limits
+            ax.set_ylim(0, self.y_size)  # Set Y-axis limits
 
             title = f'Robot Positions  |  t = {i}'
             ax.set_title(title)
@@ -317,8 +316,8 @@ class HerdModel:
         # colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']  # You can add more colors as needed
         colors = ['c', 'tab:orange', 'g', 'y']
         legends = []  # List to store legend labels
-        self.ax.set_xlim(0, 120)  # Set X-axis limits
-        self.ax.set_ylim(0, 60)  # Set Y-axis limits
+        self.ax.set_xlim(0, self.x_size)  # Set X-axis limits
+        self.ax.set_ylim(0, self.y_size)  # Set Y-axis limits
 
         for i, robot in enumerate(self.robots):
             color = colors[i % len(colors)]  # Cycle through colors if there are more robots than colors
