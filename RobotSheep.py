@@ -26,7 +26,9 @@ class RobotSheep:
             - Bt (numpy array): Control input matrix for the Kalman filter.
             - fixed_target (bool): True if the target is fixed, False if it's dynamic.
             - n_robots (int): Total number of robots in the simulation.
+            - target_radius (int, optional): Radius of the target. Default is 5.
         """
+
 
         self.unique_id = unique_id
 
@@ -76,6 +78,18 @@ class RobotSheep:
         self.GP_step_count = 0
 
     def move(self, CMP, robots, A_tilda, target_pos):
+        """
+        Move the RobotSheep agent based on the chosen control strategy.
+
+        Parameters:
+            - CMP (bool): True for CMP control, False for GP control.
+            - robots (list): List of RobotSheep agents.
+            - A_tilda (numpy array): Influence matrix between robots.
+            - target_pos (numpy array): Position of the target.
+
+        Returns:
+            - bool: True if the target is reached, otherwise False.
+        """
         dt = 1
         if CMP:
             return self.move_as_CMP(robots, A_tilda, dt, target_pos)
@@ -83,6 +97,18 @@ class RobotSheep:
             return self.move_as_GP()
 
     def move_as_CMP(self, robots, A_tilda, dt, target_pos):
+        """
+        Move the RobotSheep agent during CMP.
+
+        Parameters:
+            - robots (list): List of RobotSheep agents.
+            - A_tilda (numpy array): Influence matrix between robots.
+            - dt (float): Time step for the simulation.
+            - target_pos (numpy array): Position of the target.
+
+        Returns:
+            - bool: True if the target is reached, otherwise False.
+        """
         self.GP_step_count = 0
         theta = polar_angle(self.u)
 
@@ -151,6 +177,12 @@ class RobotSheep:
         return False
 
     def move_as_GP(self):
+        """
+        Move the RobotSheep agent during GP.
+
+        Returns:
+            - bool: True if the target is reached, otherwise False.
+        """
         self.GP_step_count += 0.000001
         probCMP = np.sqrt(self.GP_step_count)
         rand = random.uniform(0, 1)
@@ -174,15 +206,32 @@ class RobotSheep:
         return False
 
     def measure(self, target_pos):
+        """
+        Measure the position of the target and update the estimates.
+
+        Parameters:
+            - target_pos (numpy array): True position of the target.
+        """
         s_World = self.get_target_pos(target_pos)
         self.measure_target_pos(s_World)
 
     def predict(self):
+        """
+        Predict the position of the target using the Kalman filter.
+        """
         self.p_est_distr = self.At @ self.p_est_distr + self.Bt @ self.Ut
         self.Th_KF = self.At @ self.Th_KF @ self.At.T + self.Qt
         return
 
     def share(self, robot_neighborhood, D, target_pos):
+        """
+        Share information with neighboring robots to achieve consensus.
+
+        Parameters:
+            - robot_neighborhood (list): List of neighboring robots.
+            - D (list): Distance to neighboring robots.
+            - target_pos (numpy array): True position of the target.
+        """
         self.FiStore = self.Fi
         self.aiStore = self.ai
         for j in range(len(robot_neighborhood)):
@@ -193,6 +242,15 @@ class RobotSheep:
         return
 
     def get_target_pos(self, target_pos):
+        """
+        Get the position of the target in the robot's reference frame and apply sensor measurements.
+
+        Parameters:
+            - target_pos (numpy array): True position of the target.
+
+        Returns:
+            - numpy array: Sensor measurements in the world frame.
+        """
         # Target in robot reference frame
         t_pos_robot_frame = target_pos - self.pos
 
@@ -203,6 +261,12 @@ class RobotSheep:
         return s_World
 
     def measure_target_pos(self, s_World):
+        """
+        Measure the target's position and perform consensus updates.
+
+        Parameters:
+            - s_World (numpy array): Sensor measurements in the world frame.
+        """
         # Consensus
         zi = s_World
         self.Fi = self.Hi.T @ np.linalg.inv(self.Ri + self.Hi @ self.P_est @ self.Hi.T) @ self.Hi
@@ -212,6 +276,9 @@ class RobotSheep:
         self.aiStore = self.ai
 
     def update_target_est(self):
+        """
+        Update the estimated position of the target based on consensus and Kalman filter.
+        """
         if self.fixed_target:
             self.p_est_distr = np.linalg.inv(self.Fi) @ self.ai
             return
@@ -223,6 +290,15 @@ class RobotSheep:
         return
 
     def pos_kf(self, u):
+        """
+        Update the estimated position of the RobotSheep using the Kalman filter.
+
+        Parameters:
+            - u (numpy array): Control input.
+
+        Returns:
+            - bool: True if the target is reached, otherwise False.
+        """
         # Update estimated position
         random_vector = np.random.multivariate_normal([0, 0], self.Qi).reshape((-1, 1))
         uUnc = u + random_vector

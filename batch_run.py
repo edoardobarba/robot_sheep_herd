@@ -6,6 +6,22 @@ from model import HerdModel  # Import the HerdModel from the 'model' module
 
 # Define a function to run experiments with different parameters
 def batch_run(n_robots, connections, max_steps, scale_R, n_run, fixed_target, show_sim, exp_number):
+    """
+    Run experiments with different parameters using the HerdModel simulation.
+
+    Parameters:
+        - n_robots (list): List of the number of robots to use in experiments.
+        - connections (list): List of the number of connections to use in experiments.
+        - max_steps (int): Maximum number of simulation steps.
+        - scale_R (list): List of scale_R values for experiments.
+        - n_run (int): Number of runs for each combination of parameters.
+        - fixed_target (bool): True if the target is fixed, False if it's dynamic.
+        - show_sim (bool): True to display the simulation, False to run in the background.
+        - exp_number (int): Experiment number to choose the experiment type.
+
+    Returns:
+        None
+    """
     if n_run == 0:
         return
 

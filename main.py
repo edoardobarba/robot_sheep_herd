@@ -1,5 +1,25 @@
 from batch_run import *
 
+"""
+Experiment Runner Script
+
+Usage:
+    - You can choose to run a single experiment or a batch of experiments.
+    - Set the 'SINGLE_RUN' or 'BATCH_RUN' flag to control the type of run.
+    - Customize the experiment parameters within each section.
+
+Experiments:
+    - Experiment 0: Uncertainty of Target Position Sensor
+        - Preliminary experiment to investigate sensor uncertainty.
+    - Experiment 1: Influence of Number of Connections
+        - Explore the impact of the number of connections on reaching a fixed target.
+    - Experiment 2: Influence of Prediction Accuracy
+        - Investigate the effect of prediction accuracy on tracking a moving target.
+    - Experiment 3: Alternating Leadership Roles
+        - Explore the importance of alternating leadership roles during CMP phases.
+
+"""
+
 if __name__ == '__main__':
     # PUT BATCH_RUN = False TO NOT RUN BATCH RUN
     BATCH_RUN = False
