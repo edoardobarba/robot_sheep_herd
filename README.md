@@ -15,6 +15,6 @@ More details can be found in the project report.
 - **Matplotlib**
 - **Numpy**
   
-##Usage
+###Usage
 Download src folder and go inside. From 'main.py' file decide if you want to do a single run or batch run, chose the parameters and run 'main.py'
 
