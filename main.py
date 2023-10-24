@@ -1,163 +1,35 @@
-import numpy as np
-import matplotlib.pyplot as plt
-
-from model import HerdModel  # Import the HerdModel from the 'model' module
-
-
-# Define a function to run experiments with different parameters
-def batch_run(n_robots, connections, max_steps, scale_R, n_run, fixed_target, show_sim, exp_number):
-    if n_run == 0:
-        return
-
-    if exp_number == 0:
-        # Initialize a list to store average time data for different scale_R values
-        avg_time_data = []
-        for s in scale_R:
-            avg_time = []
-            for k in range(n_run):
-                # Create an instance of the HerdModel
-                model = HerdModel(n_robots=n_robots[0], n_steps=max_steps, scale_R=s, fixed_target=fixed_target,
-                                  connections=connections[0], show_sim=show_sim)
-                for i in range(max_steps):
-                    flag = model.step(i)
-
-                    if fixed_target and (flag or i == max_steps - 1):
-                        avg_time.append(i)
-                        break
-
-                if show_sim:
-                    model.plot_history_pos()
-                    model.plot_traj()
-
-            # Store the average time data for the current scale_R
-            avg_time_data.append(np.mean(np.array(avg_time)))
-
-            print("scale_R: ", s)
-            print("avg time: ", np.mean(np.array(avg_time)))
-
-        # Display the average time data using a plot
-        plt.plot(scale_R, avg_time_data)
-
-        plt.xlabel('scale_R')
-        plt.ylabel('Average Time')
-        plt.show()
-
-        return
-
-    if exp_number == 1:
-        # Initialize a dictionary to store average time data for different scale_R and connection values
-        avg_time_data = {}
-        for n in n_robots:
-            for s in scale_R:
-                for n_conn in connections:
-                    avg_time = []
-                    for k in range(n_run):
-                        # Create an instance of the HerdModel
-                        model = HerdModel(n_robots=n, n_steps=max_steps, scale_R=s, fixed_target=fixed_target,
-                                          connections=n_conn, show_sim=show_sim)
-                        for i in range(max_steps):
-                            flag = model.step(i)
-
-                            if fixed_target and (flag or i == max_steps - 1):
-                                avg_time.append(i)
-                                break
-
-                        if show_sim:
-                            model.plot_history_pos()
-                            model.plot_traj()
-
-                    # Store the average time data using a tuple (scale_R, n_conn) as the key
-                    key = (s, n_conn)
-                    avg_time_data[key] = np.mean(np.array(avg_time))
-
-                    print("n_connections: ", n_conn, "scale_R: ", s)
-                    print("avg time: ", np.mean(np.array(avg_time)))
-
-        # Display the average time data using separate lines for each scale_R value
-        for scale_R_value in scale_R:
-            avg_times = [avg_time_data[(scale_R_value, n_conn)] for n_conn in connections]
-            plt.plot(connections, avg_times, label=f'scale_R={scale_R_value}')
-
-        plt.xlabel('Connections')
-        plt.ylabel('Average Time')
-        plt.legend()
-        plt.show()
-
-        return
-
-    if exp_number == 2:
-        # Initialize a list to store average distance data for different scale_R values
-        avg_dist_data = []
-        for s in scale_R:
-            avg_dist = []
-            for k in range(n_run):
-                # Create an instance of the HerdModel
-                model = HerdModel(n_robots=n_robots[0], n_steps=max_steps, scale_R=s, fixed_target=fixed_target,
-                                  connections=connections[0], show_sim=show_sim)
-                for i in range(max_steps):
-                    model.step(i)
-                    avg_dist.append(model.get_avg_dist())
-                if show_sim:
-                    model.plot_history_pos()
-                    model.plot_traj()
-
-            # Store the average distance data for the current scale_R
-            avg_dist_data.append(np.mean(np.array(avg_dist)))
-            print("scale_R: ", s)
-            print("avg dist: ", np.mean(np.array(avg_dist)))
-
-        # Display the average distance data using a plot
-        plt.plot(scale_R, avg_dist_data)
-
-        plt.xlabel('scale_R')
-        plt.ylabel('Average Dist')
-        plt.show()
-
-        return
-
-    if exp_number == 3:
-        # Initialize a list to store average time data for a specific scale_R and connection value
-        avg_time_data = []
-
-        avg_time = []
-        for k in range(n_run):
-            # Create an instance of the HerdModel
-            model = HerdModel(n_robots=n_robots[0], n_steps=max_steps, scale_R=scale_R[0], fixed_target=fixed_target,
-                              connections=connections[0], show_sim=show_sim)
-            for i in range(max_steps):
-                flag = model.step(i)
-
-                if fixed_target and (flag or i == max_steps - 1):
-                    avg_time.append(i)
-                    print("time: ", i)
-                    break
-
-            if show_sim:
-                model.plot_history_pos()
-                model.plot_traj()
-
-        # Store the average time data for the specific case
-        avg_time_data.append(np.mean(np.array(avg_time)))
-        print("avg time: ", np.mean(np.array(avg_time_data)), " std_dev: ", np.std(np.array(avg_time_data)))
-
-        return
-
+from batch_run import *
 
 if __name__ == '__main__':
-    # PUT BATCH_RUN = 0 TO NOT RUN BATCH RUN
+    # PUT BATCH_RUN = False TO NOT RUN BATCH RUN
     BATCH_RUN = False
     SINGLE_RUN = True
 
-
     if SINGLE_RUN:
-        show_sim = False
-        fixed_target = False
-        max_steps = 300
-        n_robots = [4]
-        scale_R = [10, 100, 1000]
-        n_connections = [6]
+        # PARAMETERS FOR SINGLE RUN
+        show_sim = True  # Enable the simulation display
+        fixed_target = False  # Use a fixed target
+        max_steps = 1000  # Maximum number of steps for the simulation
+        n_robots = 4  # Number of robots in the simulation
+        scale_R = 10  # Scaling factor for R
 
+        """
+        Number of connections between robots, Maximum values: 
+            max 1 if n_robots = 2
+            max 3 if n_robots = 3
+            max 6 if n_robots = 4
+            max 10 if n_robots = 5
+            max 15 if n_robots = 6
+            ...
+        """
+        n_connections = 6
 
+        max_conn = (n_robots * (n_robots - 1)) // 2
+        if n_connections > max_conn:
+            n_connections = max_conn
+
+        batch_run([n_robots], connections=[n_connections], scale_R=[scale_R], fixed_target=fixed_target,
+                  max_steps=max_steps, n_run=1, show_sim=show_sim, exp_number=-1)
 
     if BATCH_RUN:
         # Set batch run parameters

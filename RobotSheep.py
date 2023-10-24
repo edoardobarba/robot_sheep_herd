@@ -11,7 +11,7 @@ def polar_angle(vector):
 
 
 class RobotSheep:
-    def __init__(self, unique_id, pos, Ri, Hi, Qi, R_GPS, At, Bt, fixed_target, n_robots, RobGain=0.1, target_radius = 5):
+    def __init__(self, unique_id, pos, Ri, Hi, Qi, R_GPS, At, Bt, fixed_target, n_robots, target_radius=5):
         """
         Initialize a RobotSheep agent.
 
@@ -26,7 +26,6 @@ class RobotSheep:
             - Bt (numpy array): Control input matrix for the Kalman filter.
             - fixed_target (bool): True if the target is fixed, False if it's dynamic.
             - n_robots (int): Total number of robots in the simulation.
-            - RobGain (float, optional): Gain for robot motion control (default is 0.1).
         """
 
         self.unique_id = unique_id
@@ -38,7 +37,6 @@ class RobotSheep:
         self.Hi = Hi
         self.Qi = Qi
         self.R_GPS = R_GPS
-        self.RobGain = RobGain
         self.target_radius = target_radius
 
         self.Fi = None

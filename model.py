@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 class HerdModel:
 
-    def __init__(self, n_robots: int, scale_R, n_steps, show_sim, fixed_target, connections, width=120, height=60):
+    def __init__(self, n_robots: int, scale_R, max_steps, show_sim, fixed_target, connections, width=120, height=60):
         """
         HerdModel init function
 
@@ -34,19 +34,18 @@ class HerdModel:
 
         # Create a figure and axis for the plot
         # self.fig, self.ax = plt.subplots(figsize=(10, 5))
-        self.Store = np.empty(n_steps, dtype='object')
         self.add_agents(n_robots, scale_R)
         self.add_target()
 
         # Initialize the plot with initial positions
         # self.plot_positions()
 
-        self.n_steps = n_steps
+        self.max_steps = max_steps
         self.show_sim = show_sim
         if self.show_sim:
             self.xStore = []
-            self.tStore = np.empty((n_steps, 2, 1))
-            self.uStore = np.empty(n_steps, dtype='object')
+            self.tStore = np.empty((max_steps, 2, 1))
+            self.uStore = np.empty(max_steps, dtype='object')
 
         self.A_tilda = self.get_A_tilda()
         self.CMP = False
@@ -177,7 +176,6 @@ class HerdModel:
 
                 # Compute robot neighborhood
                 robot = self.robots[i]
-                # self.plot_positions()
                 robot_neighborhood = []
                 for j in range(self.n_robots):
                     if self.A[i, j]:
@@ -239,18 +237,22 @@ class HerdModel:
         #     for j in range(i + 1, self.n_robots):  # (it's simmetric so we compute only the upper part)
         #         d = np.linalg.norm(self.robots[i].pos - self.robots[j].pos)
         #         A[i, j] = (d <= self.CR)
-        if connections >= 1:
-            A[0, 1] = 1
-        if connections >= 2:
-            A[0, 2] = 1
-        if connections >= 3:
-            A[0, 3] = 1
-        if connections >= 4:
-            A[1, 2] = 1
-        if connections >= 5:
-            A[1, 3] = 1
-        if connections == 6:
-            A[2, 3] = 1
+        # if connections == 1:
+        #     A[0, 1] = 1
+        # if connections == 2:
+        #     A[0, 2] = 1
+        # if connections == 3:
+        #     A[1, 2] = 1
+        # if connections == 4:
+        #     A[0, 3] = 1
+        # if connections == 5:
+        #     A[1, 3] = 1
+        # if connections == 6:
+        #     A[2, 3] = 1
+
+        for i in range(self.n_robots - 1):
+            for j in range(i + 1, self.n_robots):
+                A[i, j] = 1
 
         A = A + A.T
         # print(A)
@@ -275,7 +277,7 @@ class HerdModel:
 
         print("Mean Distance from (9, 5):", mean_distance)
 
-    def plot_history_pos(self):
+    def plot_history_pos(self, last_step):
 
         colors = ['c', 'tab:orange', 'g', 'y']
         legends = []  # List to store legend labels
@@ -283,7 +285,9 @@ class HerdModel:
         # Create a figure and axis
         fig, ax = plt.subplots(figsize=(10, 5))
 
-        for i in range(self.n_steps):
+        steps = last_step if last_step != -1 else self.max_steps
+
+        for i in range(steps):
             ax.clear()
             for j, robot in enumerate(self.robots):
                 color = colors[j % len(colors)]
