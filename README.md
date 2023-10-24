@@ -11,11 +11,19 @@ The report thoroughly explains how I approach this, detailing simulations and th
 More details can be found in the project report.
 
 
-### Prerequisites
+
+## Prerequisites
+
 - **Python**
 - **Matplotlib**
 - **Numpy**
-  
-### Usage
-Download src folder and go inside. From 'main.py' file decide if you want to do a single run or batch run, chose the parameters and run 'main.py'
 
+## Usage
+
+To begin using this project:
+
+1. Download the 'src' folder.
+2. Navigate to the 'main.py' file within the 'src' folder.
+3. Decide whether you want to run a single simulation or a batch run.
+4. Set the desired parameters in 'main.py'.
+5. Execute 'main.py' to run the simulation.
